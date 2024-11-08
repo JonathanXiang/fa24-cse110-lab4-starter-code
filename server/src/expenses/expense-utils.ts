@@ -1,38 +1,41 @@
+import exp from "constants";
 import { Expense } from "../types";
 import { Request, Response } from "express";
+import { Database } from "sqlite";
 
-export function createExpenseServer(req: Request, res: Response, expenses: Expense[]) {
-  const { id, cost, description } = req.body;
+export async function createExpenseServer(req: Request, res: Response, db: Database) {
+    const { id, cost, description } = req.body;
+ 
+    if (!description || !id || !cost) {
+        return res.status(400).send({ error: "Missing required fields" });
+    }
+ 
+    try {
+        await db.run('INSERT INTO expenses (id, description, cost) VALUES (?, ?, ?);', [id, description, cost]);
+    } catch (error) {
+        return res.status(400).send({ error: `Expense could not be created, + ${error}` });
+    };
+ 
+    res.status(201).send({ id, description, cost });
+ 
+ 
+ }
+ 
+ 
 
-  if (!description || !id || !cost) {
-    return res.status(400).send({ error: "Missing required fields" });
-  }
-
-  const newExpense: Expense = {
-    id: id,
-    description,
-    cost,
-  };
-
-  expenses.push(newExpense);
-  res.status(201).send(newExpense);
-}
-
-export function deleteExpense(req: Request, res: Response, expenses: Expense[]) {
+export async function deleteExpense(req: Request, res: Response, db: Database) {
   const expenseId = req.params.id;
-  const expenseIndex = expenses.findIndex((expense) => expense.id === expenseId);
+  const expense = await db.get('SELECT * FROM expenses WHERE id = ?;', [expenseId])
 
-  if (expenseIndex === -1) {
+  if (!expense) {
     return res.status(404).send({ error: "Expense not found" });
   }
 
-  const deletedExpense = expenses[expenseIndex];
-
-  expenses.splice(expenseIndex, 1);
-
-  res.status(200).send({ message: "Expense deleted", deletedExpense });
+  await db.run('DELETE FROM expenses WHERE id = ?;', [expenseId])
+  res.status(200).send({ message: "Expense deleted" });
 }
 
-export function getExpenses(req: Request, res: Response, expenses: Expense[]) {
+export async function getExpenses(req: Request, res: Response, db: Database) {
+  const expenses = await db.all('SELECT * FROM expenses');
   res.status(200).send({ data: expenses });
 }
